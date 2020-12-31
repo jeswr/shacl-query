@@ -1,62 +1,77 @@
 import { Generator } from 'sparqljs';
 import { namedNode, quad, variable } from '@rdfjs/data-model';
 import { Term, NamedNode } from 'rdf-js';
-
 import type { queryEngine } from './types'
 import { generateVar } from './variable-generator'
 import { IQueryResult } from '@comunica/actor-init-sparql';
+import ExtendedEngine from './engine'
 
 // THIS MODULE SHOULD WORK *WITHOUT* ANY INFERENCED DATA
-
 // TODO: Just steal tfle
-
 // This library *is not* responsible for performing *validation*
 // of the shape - and assumes that a *valid* NodeShape is being passed
 // into the function
 // Furthermore we assume that the shape is *already* from a skolemized source,
 // if this is note the case use the shape-shape to extract the shape
 // TODO: CHANGE TYPE OF FOCUS NODE TO NamedNode | NamedNode[]
+
+/**
+   * 
+   * @param term term for the path
+   * @param name the name of the variable/named node
+   */
+async function addPath(path: Term, name: string, generator: Generator, engine: ExtendedEngine, paths: Term[], mappings: Record<string, number>) {
+  const triples = []
+  if (path.termType === 'NamedNode') {
+    triples.push({
+      triple: [name, '<' + path.value + '>', generator.next().value],
+      optional: false // If this is set to true then OPTIONAL { /* triple */ } is used
+    })
+  } else if (path.termType === 'BlankNode') {
+    const predicate = await engine.getBoundResults(`SELECT DISTINCT ?r WHERE { <${path.value}> ?r ?o }`);
+    if (predicate.length === 1 && predicate[0].termType === 'NamedNode') {
+      // This is one of the sh:???path predicates
+      switch (predicate[0].value) {
+        // This one we need to add ? on the actual query so that 
+        case 'http://www.w3.org/ns/shacl#zeroOrOnePath':
+          return '?' + path
+        case 'http://www.w3.org/ns/shacl#oneOrMorePath':
+        case 'http://www.w3.org/ns/shacl#zeroOrMorePath':
+        case 'http://www.w3.org/ns/shacl#alternativePath':
+        case 'http://www.w3.org/ns/shacl#inversePath':
+      }
+    } else if (predicate.length === 2) {
+      // This is a list and hence a sequential path
+      let tempName = name
+      const list = await engine.getList(path)
+      for (const elem of list) {
+        addPath(elem, tempName, generator, engine)
+        tempName = '?' + generator.next().value;
+      }
+    } else {
+      throw new Error('Invalid path')
+    }
+
+
+    // // TODO: Handle all other path types - atm this just works for sequence
+    // const list = await engine.getList(path)
+  } else {
+    throw new Error('Expected blank node *or* named node')
+  }
+}
+
+
+
 export async function ShapeToSPARQL(shapeEngine: queryEngine, nodeShape: NamedNode, focusNode: NamedNode) {
-  
-  async function getBoundResults(query: string): Promise<Term[]> {
-    const res = await shapeEngine.query(query)
-    if (res.type !== 'bindings') {
-      throw new Error('Bindings expected')
-    }
-    const bindings = (await res.bindings()).map(binding => binding.get('?r'))
-    for (const binding of bindings) {
-      if ('skolemized' in binding) {
-        // @ts-ignore
-        binding.value = binding.skolemized.value
-      } 
-    }
-    return bindings
-  }
+  const engine = new ExtendedEngine(shapeEngine);
 
-  // Used for queries where exactly one object is expected
-  async function getSingle(query: string): Promise<Term> {
-    const res = await getBoundResults(query)
-    if (res.length !== 1) {
-      throw new Error('Exactly one object expected for query: ' + query)
-    }
-    return res[0];
-  }
 
-  // Extracts an rdf:list
-  async function getList(term: Term): Promise<Term[]> {
-    let tempTerm = term
-    const result: Term[] = []
-    while (!(tempTerm.termType === 'NamedNode' && tempTerm.value === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#nil')) {
-      result.push(await getSingle(`SELECT DISTINCT ?r WHERE { <${tempTerm.value}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> ?r }`))
-      tempTerm = await getSingle(`SELECT DISTINCT ?r WHERE { <${tempTerm.value}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> ?r }`)
-    }
-    return result;
-  }
-    
   let generator = generateVar();
   let currentVar = '<' + focusNode.value + '>';
   let node = nodeShape;
-  
+
+
+
   // The issue with rdf:list is more generally an issue with any path that is not restricted to finite length
   // ie sh:path ( sh:ignoredProperties [ sh:zeroOrMorePath rdf:rest ] rdf:first ) ;
   // This is another issue that we have (in addition to nested shapes)
@@ -64,30 +79,16 @@ export async function ShapeToSPARQL(shapeEngine: queryEngine, nodeShape: NamedNo
   // to the query - atm this may be a reasonable option
   // TODO: Handle logic extraction
   const triples: { triple: [string, string, string], optional: boolean }[] = []
+
+
+
+
   const res = await getBoundResults(`SELECT DISTINCT ?r WHERE { <${node.value}> <http://www.w3.org/ns/shacl#property> ?r }`);
   for (const property of res) {
-    const paths = await getBoundResults(`SELECT DISTINCT ?r WHERE { <${property.value}> <http://www.w3.org/ns/shacl#path> ?r }`);
-    if (paths.length === 1) {
-      const [path] = paths;
-      if (path.termType === 'NamedNode') {
-        // TODO: Fix this
-        triples.push({
-          triple: [currentVar, '<' + path.value + '>', currentVar = '?' + generator.next().value],
-          optional: false // If this is set to true then OPTIONAL { /* triple */ } is used
-        })
-      } else if (path.termType === 'BlankNode') {
-        const predicate = await getBoundResults(`SELECT DISTINCT ?r WHERE { <${path.value}> ?r ?o }`);
-        // TODO: Handle all other path types - atm this just works for sequence
-        const list = await getList(path)
-        console.log(list)
-      } else {
-        throw new Error('Expected blank node *or* named node')
-      }
-    } else {
-      throw new Error('Path predicate should have exactly one object')
-    }
+    const path = await getSingle(`SELECT DISTINCT ?r WHERE { <${property.value}> <http://www.w3.org/ns/shacl#path> ?r }`);
+    addPath(path, currentVar)
   }
-  
+
 
 
   // Thinking about the issue of recursion - obviously we *may* need to break up the query
@@ -110,7 +111,7 @@ export async function ShapeToSPARQL(shapeEngine: queryEngine, nodeShape: NamedNo
     const tripleString = triple.join(' ')
     return optional ? `OPTIONAL { ${tripleString} }` : tripleString
   }).join(' .\n  ')
-  
+
   return `CONSTRUCT {\n  ${internal} .\n} WHERE {\n ${internal} .\n}`
 }
 
@@ -128,7 +129,7 @@ export function parseCollectLengthBindings(res: IQueryResult): Record<string, nu
   }
   const [binding] = bindings;
 
-  const result: Record<string, number> = {}
+  const result: Record<string, number> = {};
   // TODO: Clean up this section - think there is issue with type def of bindings
   const obj = binding.toObject()
   for (const key of Object.keys(obj)) {
@@ -174,13 +175,13 @@ function collectLengths(shapeEngine: queryEngine, nodeShape: NamedNode, focusNod
   //    <http://example.org/humanWikidataShape> <http://www.w3.org/ns/shacl#property>/<http://www.w3.org/ns/shacl#in>* ?a . ?a rdf:rest+ ?b
   //   }
   //   }
-    
+
   //   {
   //   SELECT (COUNT(?b) as ?internalCount2) WHERE { 
   //    <http://example.org/humanWikidataShape> <http://www.w3.org/ns/shacl#property>* ?a . ?a <http://www.w3.org/ns/shacl#property>+ ?b
   //   }
   //   }
-    
+
   //   }
 
 
@@ -198,24 +199,24 @@ function collectLengths(shapeEngine: queryEngine, nodeShape: NamedNode, focusNod
   //   }
 
 
-// SELECT ?c WHERE { 
-// <http://example.org/humanWikidataShape> <http://www.w3.org/ns/shacl#property>/<http://www.w3.org/ns/shacl#in> ?a .
-//  ?a rdf:rest* ?b BIND(COUNT(?b) as ?c)
+  // SELECT ?c WHERE { 
+  // <http://example.org/humanWikidataShape> <http://www.w3.org/ns/shacl#property>/<http://www.w3.org/ns/shacl#in> ?a .
+  //  ?a rdf:rest* ?b BIND(COUNT(?b) as ?c)
 }
 
 
-  // SELECT (MAX(?c) as ?count) WHERE { ?r ?a ?s 
-  //   { 
-  //   SELECT (COUNT(?o) as ?c) WHERE { ?s rdf:rest*/rdf:first ?o } } 
-  //   }
-  
-  
-  
-  const repeats: Record<string, number> = {};
+// SELECT (MAX(?c) as ?count) WHERE { ?r ?a ?s 
+//   { 
+//   SELECT (COUNT(?o) as ?c) WHERE { ?s rdf:rest*/rdf:first ?o } } 
+//   }
 
 
 
-  return {};
+const repeats: Record<string, number> = {};
+
+
+
+return {};
 }
 
 

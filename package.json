@@ -10,7 +10,7 @@
   "scripts": {
     "test": "jest",
     "lint": "eslint lib/* --ext .ts",
-    "lint:fix": "eslint lib/* __tests__/* --ext .ts --fix",
+    "lint:fix": "eslint lib/* __tests__/*.ts --ext .ts --fix",
     "build": "tsc",
     "prepare": "tsc"
   },
@@ -45,6 +45,7 @@
     "eslint-plugin-import": "^2.22.1",
     "jest": "^26.6.3",
     "n3": "^1.6.4",
+    "pre-commit": "^1.2.2",
     "ts-jest": "^26.4.4"
   },
   "jest": {
