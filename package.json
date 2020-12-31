@@ -1,0 +1,58 @@
+{
+  "name": "shacl-query",
+  "version": "1.0.0",
+  "description": "Creates a construct query to collect data conforming to a SHACL constraint",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/lib/*"
+  ],
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint lib/* --ext .ts",
+    "lint:fix": "eslint lib/* __tests__/* --ext .ts --fix",
+    "build": "tsc",
+    "prepare": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jeswr/shacl-query.git"
+  },
+  "keywords": [
+    "SHACL",
+    "construct",
+    "query"
+  ],
+  "author": "Jesse Wright <jesse.wright@anu.edu.au>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jeswr/shacl-query/issues"
+  },
+  "homepage": "https://github.com/jeswr/shacl-query#readme",
+  "devDependencies": {
+    "@comunica/actor-init-sparql": "^1.18.1",
+    "@comunica/actor-init-sparql-file": "^1.18.1",
+    "@comunica/actor-init-sparql-rdfjs": "^1.18.1",
+    "@ldflex/comunica": "^3.4.2",
+    "@rdfjs/data-model": "^1.2.0",
+    "@types/jest": "^26.0.19",
+    "@types/md5": "^2.2.1",
+    "@types/sparqljs": "^3.1.1",
+    "@typescript-eslint/eslint-plugin": "^4.11.1",
+    "@typescript-eslint/parser": "^4.11.1",
+    "eslint": "^7.16.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-plugin-import": "^2.22.1",
+    "jest": "^26.6.3",
+    "n3": "^1.6.4",
+    "ts-jest": "^26.4.4"
+  },
+  "jest": {
+    "preset": "ts-jest"
+  },
+  "dependencies": {
+    "@types/rdf-js": "^4.0.0",
+    "md5": "^2.3.0",
+    "sparqljs": "^3.2.0"
+  }
+}
