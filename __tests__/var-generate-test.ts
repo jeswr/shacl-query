@@ -1,5 +1,5 @@
 /* eslint-disable no-undef */
-import { generateVar, numToString } from '../lib/variable-generator';
+import { generateVar, numToString } from '../lib/utils/variable-generator';
 
 describe('Unit tests for numToString', () => {
   it('Should convert 0 to \'a\'', () => {

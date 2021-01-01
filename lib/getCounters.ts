@@ -1,6 +1,6 @@
 /* eslint-disable no-await-in-loop */
 import { Term } from 'rdf-js';
-import ExtendedEngine from './engine';
+import ExtendedEngine from './utils/engine';
 
 /**
  * This function is used to collect all the paths

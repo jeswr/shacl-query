@@ -1,5 +1,5 @@
 import { Term } from 'rdf-js';
-import { queryEngine } from './types';
+import { queryEngine } from '../types';
 
 /**
  * Query engine extended with convenience methods for

@@ -1,4 +1,5 @@
 // Only needs to be exported for unit tests
+// This function is also really messy
 export function numToString(i: number): string {
   let itemp = i;
   let str = '';
@@ -11,14 +12,6 @@ export function numToString(i: number): string {
   }
   str = String.fromCharCode((itemp % 26) + 96) + str;
   return str;
-
-  // let str = ''
-  // for (let p = 0; i + 1 >= (26 ** p); p++) {
-  //   // console.log((Math.floor(i / (26 ** (p))) % 26) + 96)
-  //   const char = String.fromCharCode((Math.floor(i / (26 ** p)) % 26) + 97)
-  //   str = str + char
-  // }
-  // return str;
 }
 
 /**

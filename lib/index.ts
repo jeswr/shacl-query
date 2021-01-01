@@ -2,9 +2,9 @@ import { Generator } from 'sparqljs';
 import { namedNode, quad, variable } from '@rdfjs/data-model';
 import { Term, NamedNode } from 'rdf-js';
 import type { queryEngine } from './types'
-import { generateVar } from './variable-generator'
+import { generateVar } from './utils/variable-generator'
 import { IQueryResult } from '@comunica/actor-init-sparql';
-import ExtendedEngine from './engine'
+import ExtendedEngine from './utils/engine'
 
 // Note that closed and ignoredProperties do not affect the behavior of this library
 
