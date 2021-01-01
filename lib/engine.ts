@@ -16,6 +16,10 @@ export default class ExtendedEngine {
     return this.engine.query(q);
   }
 
+  /**
+   * A function that processes result bindings from the engine
+   * @param query A sparql query in one variable named 'r'
+   */
   async getBoundResults(query: string): Promise<Term[]> {
     const res = await this.engine.query(query);
     if (res.type !== 'bindings') {

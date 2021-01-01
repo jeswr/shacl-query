@@ -6,11 +6,13 @@ import { generateVar } from './variable-generator'
 import { IQueryResult } from '@comunica/actor-init-sparql';
 import ExtendedEngine from './engine'
 
-// THIS MODULE SHOULD WORK *WITHOUT* ANY INFERENCED DATA
+// Note that closed and ignoredProperties do not affect the behavior of this library
+
+// THIS MODULE SHOULD WORK *WITHOUT* ANY INFERENCED DATA ABOUT THE CONSTRAINT
 // TODO: Just steal tfle
 // This library *is not* responsible for performing *validation*
 // of the shape - and assumes that a *valid* NodeShape is being passed
-// into the function
+// into the function [use anther lib to do this first]
 // Furthermore we assume that the shape is *already* from a skolemized source,
 // if this is note the case use the shape-shape to extract the shape
 // TODO: CHANGE TYPE OF FOCUS NODE TO NamedNode | NamedNode[]
