@@ -12,7 +12,7 @@ interface ListPath extends PathInterface {
   type: 'sequence' | 'alternate';
   path: Path[];
 }
-
+ 
 interface AtomPath extends PathInterface {
   type: 'zeroOrOne' | 'zeroOrMore';
   path: Path;
