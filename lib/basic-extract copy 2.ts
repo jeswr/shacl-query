@@ -1,6 +1,7 @@
 /* eslint-disable no-use-before-define */
 /* eslint-disable no-await-in-loop */
 import { Term } from 'rdf-js';
+import arrayifyStream from 'arrayify-stream';
 import ExtendedEngine from './utils/engine';
 import { Path } from './types';
 
@@ -93,26 +94,41 @@ SELECT DISTINCT ?property ?path WHERE {
   if (res.type !== 'bindings') {
     throw new Error('Expected bindings of length 1');
   }
-  const properties = res.bindingsStream.map(async (result) => {
-    const property = extractNodes(result.get('?property'), engine);
-    const path = extractPath(result.get('?path'), engine, true);
-    return {
-      path: await path,
-      nested: await property,
-    };
+
+  const properties = res.bindingsStream.map(async (result): Promise<Path> => {
+    const path = extractPath(result.get('?path'), engine);
+    const nodes = await extractNodes(result.get('?property'), engine);
+    if (nodes.length > 0) {
+      return {
+        type: 'sequence',
+        path: [await path, {
+          type: 'alternate',
+          path: nodes,
+          focus: false, // TODO: Double check
+        }],
+        focus: false, // TODO: Double Check this
+      };
+    }
+    return path;
   });
 
-  const bindings = await res.bindings();
-
-  const paths = res.map((pred) => {
-    const res = await engine.getBoundResults(`
-PREFIX sh: <http://www.w3.org/ns/shacl#> .
-SELECT DISTINCT ?r WHERE { 
-  <${node.value}> (sh:not|sh:and|sh:or|sh:xone)*/sh:property ?r 
-}`);
+  return new Promise((resolve, reject) => {
+    const array: Path[] = [];
+    properties.on('data', (d: Path) => {
+      array.push(d);
+    });
+    properties.on('end', () => {
+      resolve({
+        type: 'alternate',
+        path: array,
+        focus: true, // Think this should be only focus and rest are set to false?
+      });
+    });
+    properties.on('error', (e) => {
+      reject(e);
+    });
   });
 }
-
 
 async function extractNodes(propertyNode: Term, engine: ExtendedEngine) {
   const res = await engine.getBoundResults(`SELECT DISTINCT ?r WHERE { <${propertyNode.value}> <http://www.w3.org/ns/shacl#node> ?r }`);
