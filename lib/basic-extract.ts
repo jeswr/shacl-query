@@ -149,7 +149,6 @@ async function extractNodes(propertyNode: Term, engine: ExtendedEngine) {
   console.log(q);
   const res = await engine.getBoundResults(q);
   console.log(res);
-  return [];
   return Promise.all(res.map((node) => extractProperties(node, engine)));
 }
 
