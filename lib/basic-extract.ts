@@ -1,7 +1,7 @@
+/* eslint-disable no-case-declarations */
 /* eslint-disable no-use-before-define */
 /* eslint-disable no-await-in-loop */
 import { Term } from 'rdf-js';
-import arrayifyStream from 'arrayify-stream';
 import ExtendedEngine from './utils/engine';
 import { Path } from './types';
 
@@ -25,7 +25,9 @@ async function extractPath(path: Term, engine: ExtendedEngine, focus = false): P
       focus,
     };
   } if (path.termType === 'BlankNode') {
-    const res = await engine.query(`SELECT DISTINCT ?r ?o WHERE { <${path.value}> ?r ?o }`);
+    const res = await engine.query(`SELECT DISTINCT ?r ?o WHERE { <${
+      // @ts-ignore
+      path.skolemized?.value ?? path.value}> ?r ?o }`);
     if (res.type !== 'bindings') {
       throw new Error('Bindings expected');
     }
@@ -57,9 +59,10 @@ async function extractPath(path: Term, engine: ExtendedEngine, focus = false): P
         case 'http://www.w3.org/ns/shacl#zeroOrMorePath':
           return { type: 'zeroOrMore', path: await extractPath(bindings[0].get('?o'), engine), focus };
         case 'http://www.w3.org/ns/shacl#alternativePath':
+          const pt = await Promise.all((await engine.getList(bindings[0].get('?o'))).map((pth) => extractPath(pth, engine)));
           return {
             type: 'alternate',
-            path: await Promise.all((await engine.getList(bindings[0].get('?o'))).map((pth) => extractPath(pth, engine))),
+            path: pt,
             focus,
           };
         case 'http://www.w3.org/ns/shacl#inversePath':
@@ -85,23 +88,32 @@ async function extractPath(path: Term, engine: ExtendedEngine, focus = false): P
 
 export async function extractProperties(node: Term, engine: ExtendedEngine): Promise<Path> {
   // Be carefule of recursive property shapes
-  const res = await engine.query(`
-PREFIX sh: <http://www.w3.org/ns/shacl#> .
+  // @ts-ignore
+  const q = `
+PREFIX sh: <http://www.w3.org/ns/shacl#>
 SELECT DISTINCT ?property ?path WHERE { 
-  <${node.value}> (sh:not|sh:and|sh:or|sh:xone)*/sh:property ?property .
-                  ?property sh:path ?path .
-}`);
+  <${
+  // @ts-ignore
+  node.skolemized?.value ?? node.value}> (sh:not|sh:and|sh:or|sh:xone)*/sh:property ?property .
+  ?property sh:path ?path .
+}`;
+
+  console.log(q);
+
+  const res = await engine.query(q);
+
   if (res.type !== 'bindings') {
     throw new Error('Expected bindings of length 1');
   }
-
+  console.log('pre binding stream');
   const properties = res.bindingsStream.map(async (result): Promise<Path> => {
-    const path = extractPath(result.get('?path'), engine);
+    // TODO: Remove this await once finished debugging
+    const path = await extractPath(result.get('?path'), engine);
     const nodes = await extractNodes(result.get('?property'), engine);
     if (nodes.length > 0) {
       return {
         type: 'sequence',
-        path: [await path, {
+        path: [path, {
           type: 'alternate',
           path: nodes,
           focus: false, // TODO: Double check
@@ -111,16 +123,16 @@ SELECT DISTINCT ?property ?path WHERE {
     }
     return path;
   });
-
+  console.log('post bining stream');
   return new Promise((resolve, reject) => {
-    const array: Path[] = [];
-    properties.on('data', (d: Path) => {
+    const array: Promise<Path>[] = [];
+    properties.on('data', (d: Promise<Path>) => {
       array.push(d);
     });
-    properties.on('end', () => {
+    properties.on('end', async () => {
       resolve({
         type: 'alternate',
-        path: array,
+        path: await Promise.all(array),
         focus: true, // Think this should be only focus and rest are set to false?
       });
     });
@@ -131,18 +143,26 @@ SELECT DISTINCT ?property ?path WHERE {
 }
 
 async function extractNodes(propertyNode: Term, engine: ExtendedEngine) {
-  const res = await engine.getBoundResults(`SELECT DISTINCT ?r WHERE { <${propertyNode.value}> <http://www.w3.org/ns/shacl#node> ?r }`);
+  // TODO: Remove when finished debugging
+  // @ts-ignore
+  const q = `SELECT ?r WHERE { <${propertyNode.skolemized?.value ?? propertyNode.value}> <http://www.w3.org/ns/shacl#node> ?r }`;
+  console.log(q);
+  const res = await engine.getBoundResults(q);
+  console.log(res);
+  return [];
   return Promise.all(res.map((node) => extractProperties(node, engine)));
 }
 
 /**
  * This is a basic extraction algorithm for *nodeShapes*
  */
-export default async function basicExtract(node: Term, engine: ExtendedEngine) {
+export async function basicExtract(node: Term, engine: ExtendedEngine) {
   const res = await engine.getBoundResults(`
-PREFIX sh: <http://www.w3.org/ns/shacl#> .
+PREFIX sh: <http://www.w3.org/ns/shacl#>
 SELECT DISTINCT ?r WHERE { 
-  <${node.value}> (sh:not|sh:and|sh:or|sh:xone)*/sh:property ?r 
+  <${
+  // @ts-ignore
+  node.skolemized?.value ?? node.value}> (sh:not|sh:and|sh:or|sh:xone)*/sh:property ?r 
 }`);
 
   // const res = await engine.getBoundResults(`SELECT DISTINCT ?r WHERE { <${node.value}> <http://www.w3.org/ns/shacl#property> ?r }`);

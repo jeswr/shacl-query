@@ -33,6 +33,7 @@
     "@comunica/actor-init-sparql": "^1.18.1",
     "@comunica/actor-init-sparql-file": "^1.18.1",
     "@comunica/actor-init-sparql-rdfjs": "^1.18.1",
+    "@comunica/bus-query-operation": "^1.18.1",
     "@ldflex/comunica": "^3.4.2",
     "@rdfjs/data-model": "^1.2.0",
     "@types/arrayify-stream": "^1.0.0",
@@ -55,6 +56,7 @@
   "dependencies": {
     "@types/rdf-js": "^4.0.0",
     "arrayify-stream": "^1.0.0",
+    "logic-statement-ts": "github:jeswr/logic-statement-ts",
     "md5": "^2.3.0",
     "sparqljs": "^3.2.0"
   }

@@ -7,9 +7,6 @@ import ExtendedEngine from './utils/engine';
  * that we need to run the count query for
  */
 export default async function getCounters(node: Term, engine: ExtendedEngine) {
-
-
-  
   const res = await engine.getBoundResults(`SELECT DISTINCT ?r WHERE { <${node.value}> <http://www.w3.org/ns/shacl#property> ?r }`);
 
   for (const result of res) {

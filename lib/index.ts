@@ -1,10 +1,10 @@
 import { Generator } from 'sparqljs';
 import { namedNode, quad, variable } from '@rdfjs/data-model';
 import { Term, NamedNode } from 'rdf-js';
-import type { queryEngine } from './types'
-import { generateVar } from './utils/variable-generator'
 import { IQueryResult } from '@comunica/actor-init-sparql';
-import ExtendedEngine from './utils/engine'
+import type { queryEngine } from './types';
+import { generateVar } from './utils/variable-generator';
+import ExtendedEngine from './utils/engine';
 
 // Note that closed and ignoredProperties do not affect the behavior of this library
 
@@ -18,25 +18,25 @@ import ExtendedEngine from './utils/engine'
 // TODO: CHANGE TYPE OF FOCUS NODE TO NamedNode | NamedNode[]
 
 /**
-   * 
+   *
    * @param term term for the path
    * @param name the name of the variable/named node
    */
 async function addPath(path: Term, name: string, generator: Generator, engine: ExtendedEngine, paths: Term[], mappings: Record<string, number>) {
-  const triples = []
+  const triples = [];
   if (path.termType === 'NamedNode') {
     triples.push({
-      triple: [name, '<' + path.value + '>', generator.next().value],
-      optional: false // If this is set to true then OPTIONAL { /* triple */ } is used
-    })
+      triple: [name, `<${path.value}>`, generator.next().value],
+      optional: false, // If this is set to true then OPTIONAL { /* triple */ } is used
+    });
   } else if (path.termType === 'BlankNode') {
     const predicate = await engine.getBoundResults(`SELECT DISTINCT ?r WHERE { <${path.value}> ?r ?o }`);
     if (predicate.length === 1 && predicate[0].termType === 'NamedNode') {
       // This is one of the sh:???path predicates
       switch (predicate[0].value) {
-        // This one we need to add ? on the actual query so that 
+        // This one we need to add ? on the actual query so that
         case 'http://www.w3.org/ns/shacl#zeroOrOnePath':
-          return '?' + path
+          return `?${path}`;
         case 'http://www.w3.org/ns/shacl#oneOrMorePath':
         case 'http://www.w3.org/ns/shacl#zeroOrMorePath':
         case 'http://www.w3.org/ns/shacl#alternativePath':
@@ -44,54 +44,43 @@ async function addPath(path: Term, name: string, generator: Generator, engine: E
       }
     } else if (predicate.length === 2) {
       // This is a list and hence a sequential path
-      let tempName = name
-      const list = await engine.getList(path)
+      let tempName = name;
+      const list = await engine.getList(path);
       for (const elem of list) {
-        addPath(elem, tempName, generator, engine)
-        tempName = '?' + generator.next().value;
+        addPath(elem, tempName, generator, engine);
+        tempName = `?${generator.next().value}`;
       }
     } else {
-      throw new Error('Invalid path')
+      throw new Error('Invalid path');
     }
-
 
     // // TODO: Handle all other path types - atm this just works for sequence
     // const list = await engine.getList(path)
   } else {
-    throw new Error('Expected blank node *or* named node')
+    throw new Error('Expected blank node *or* named node');
   }
 }
-
-
 
 export async function ShapeToSPARQL(shapeEngine: queryEngine, nodeShape: NamedNode, focusNode: NamedNode) {
   const engine = new ExtendedEngine(shapeEngine);
 
-
-  let generator = generateVar();
-  let currentVar = '<' + focusNode.value + '>';
-  let node = nodeShape;
-
-
+  const generator = generateVar();
+  const currentVar = `<${focusNode.value}>`;
+  const node = nodeShape;
 
   // The issue with rdf:list is more generally an issue with any path that is not restricted to finite length
   // ie sh:path ( sh:ignoredProperties [ sh:zeroOrMorePath rdf:rest ] rdf:first ) ;
   // This is another issue that we have (in addition to nested shapes)
-  // Thought -> send an *initial* query that collects the length of such path and then adds the OPTIONAL {} 
+  // Thought -> send an *initial* query that collects the length of such path and then adds the OPTIONAL {}
   // to the query - atm this may be a reasonable option
   // TODO: Handle logic extraction
-  const triples: { triple: [string, string, string], optional: boolean }[] = []
-
-
-
+  const triples: { triple: [string, string, string], optional: boolean }[] = [];
 
   const res = await getBoundResults(`SELECT DISTINCT ?r WHERE { <${node.value}> <http://www.w3.org/ns/shacl#property> ?r }`);
   for (const property of res) {
     const path = await getSingle(`SELECT DISTINCT ?r WHERE { <${property.value}> <http://www.w3.org/ns/shacl#path> ?r }`);
-    addPath(path, currentVar)
+    addPath(path, currentVar);
   }
-
-
 
   // Thinking about the issue of recursion - obviously we *may* need to break up the query
   // so each *nested* NodeShape should be its *own* query
@@ -108,43 +97,42 @@ export async function ShapeToSPARQL(shapeEngine: queryEngine, nodeShape: NamedNo
   // for ()
   // return properties
 
-  const internal = triples.map(data => {
-    const { optional, triple } = data
-    const tripleString = triple.join(' ')
-    return optional ? `OPTIONAL { ${tripleString} }` : tripleString
-  }).join(' .\n  ')
+  const internal = triples.map((data) => {
+    const { optional, triple } = data;
+    const tripleString = triple.join(' ');
+    return optional ? `OPTIONAL { ${tripleString} }` : tripleString;
+  }).join(' .\n  ');
 
-  return `CONSTRUCT {\n  ${internal} .\n} WHERE {\n ${internal} .\n}`
+  return `CONSTRUCT {\n  ${internal} .\n} WHERE {\n ${internal} .\n}`;
 }
-
 
 /**
  * Internal select count
  */
 export function parseCollectLengthBindings(res: IQueryResult): Record<string, number> {
   if (res.type !== 'bindings') {
-    throw new Error('Bindings expected')
+    throw new Error('Bindings expected');
   }
-  const bindings = await res.bindings()
+  const bindings = await res.bindings();
   if (bindings.length !== 1) {
-    throw new Error('Invalid length collection - result should be of length 1')
+    throw new Error('Invalid length collection - result should be of length 1');
   }
   const [binding] = bindings;
 
   const result: Record<string, number> = {};
   // TODO: Clean up this section - think there is issue with type def of bindings
-  const obj = binding.toObject()
+  const obj = binding.toObject();
   for (const key of Object.keys(obj)) {
-    const term = obj[key]
+    const term = obj[key];
     if (term.termType === 'Variable') {
-      const value = Number(term.value)
+      const value = Number(term.value);
       if (Number.isInteger(value)) {
         result[key] = value;
       } else {
-        throw new Error(`Binding for key ${key} needs to be an integer, not ${value}`)
+        throw new Error(`Binding for key ${key} needs to be an integer, not ${value}`);
       }
     } else {
-      throw new Error(`Binding for key ${key} needs to be a variable, not a ${term.termType}`)
+      throw new Error(`Binding for key ${key} needs to be a variable, not a ${term.termType}`);
     }
   }
   return result;
@@ -154,79 +142,18 @@ export function parseCollectLengthBindings(res: IQueryResult): Record<string, nu
 /**
  * This function is used to extract the *maximum length* of queries involving
  * variable length paths.
- * 
+ *
  * Sample use case: extracting a list from a data source that *does not* skolemize
  * blank nodes. In this case we need to extract the whole list in a single query *and*
  * we should mainitain order. Without recursion - or knowing the length of the path beforehand
- * to hardcode the path length into the SPARQL query - this *cannot* be done. 
+ * to hardcode the path length into the SPARQL query - this *cannot* be done.
  */
 function collectLengths(shapeEngine: queryEngine, nodeShape: NamedNode, focusNode: NamedNode): Record<string, number> {
   async function getBoundResults(query: string) {
-    const res = await shapeEngine.query(query)
+    const res = await shapeEngine.query(query);
     if (res.type !== 'bindings') {
-      throw new Error('Bindings expected')
+      throw new Error('Bindings expected');
     }
-    return res
+    return res;
   }
-
-
-
-  // SELECT (MAX(?internalCount1) as ?c1) (MAX(?internalCount2) as ?c2) WHERE {
-  //   {
-  //   SELECT (COUNT(?b) as ?internalCount1) WHERE { 
-  //    <http://example.org/humanWikidataShape> <http://www.w3.org/ns/shacl#property>/<http://www.w3.org/ns/shacl#in>* ?a . ?a rdf:rest+ ?b
-  //   }
-  //   }
-
-  //   {
-  //   SELECT (COUNT(?b) as ?internalCount2) WHERE { 
-  //    <http://example.org/humanWikidataShape> <http://www.w3.org/ns/shacl#property>* ?a . ?a <http://www.w3.org/ns/shacl#property>+ ?b
-  //   }
-  //   }
-
-  //   }
-
-
-  // zeroOrMore
-  // oneOrMore
-
-  // for *now* performance is a *low* priority
-
-  // GENERAL QUERY FORMAT
-  // SELECT (MAX(?count) as ?c1) WHERE {
-  //   SELECT ?a (COUNT(?b) as ?count) WHERE { 
-  //    <http://example.org/humanWikidataShape> <http://www.w3.org/ns/shacl#property>/<http://www.w3.org/ns/shacl#in>* ?a .
-  //    ?a rdf:rest+ ?b
-  //   }
-  //   }
-
-
-  // SELECT ?c WHERE { 
-  // <http://example.org/humanWikidataShape> <http://www.w3.org/ns/shacl#property>/<http://www.w3.org/ns/shacl#in> ?a .
-  //  ?a rdf:rest* ?b BIND(COUNT(?b) as ?c)
 }
-
-
-// SELECT (MAX(?c) as ?count) WHERE { ?r ?a ?s 
-//   { 
-//   SELECT (COUNT(?o) as ?c) WHERE { ?s rdf:rest*/rdf:first ?o } } 
-//   }
-
-
-
-const repeats: Record<string, number> = {};
-
-
-
-return {};
-}
-
-
-  // : any, focusNode: Term) {
-  // for await (const property of shape.property) {
-  //   const path = await property.path;
-  // }
-// }
-
-// const generator = new Generator({});
-// generator.createGenerator();

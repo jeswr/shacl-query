@@ -5,25 +5,7 @@ import { newEngine as fileEngine } from '@comunica/actor-init-sparql-file';
 import { blankNode, namedNode, quad } from '@rdfjs/data-model';
 import type { ActorInitSparql } from '@comunica/actor-init-sparql';
 import { ShapeToSPARQL } from '../lib';
-
-class QueryEngine {
-  private sources: Store[] | string[] = [];
-
-  private engine: ActorInitSparql = newEngine();
-
-  constructor(sources: Store[] | string[], engine?: ActorInitSparql) {
-    this.sources = sources;
-    if (engine) {
-      this.engine = engine;
-    }
-  }
-
-  query(q: string) {
-    return this.engine.query(q, {
-      sources: this.sources,
-    });
-  }
-}
+import QueryEngine from './query-engine';
 
 describe('Producing CONSTRUCT queries from in-memory shapes', () => {
   const store = new Store();
