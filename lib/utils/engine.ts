@@ -45,16 +45,16 @@ export default class ExtendedEngine {
   }
 
   // Extracts an rdf:list
+  // This function REQUIRES blank nodes to be skolemized
   async getList(term: Term): Promise<Term[]> {
     let tempTerm = term;
-    const result: Term[] = [];
+    const result: Promise<Term>[] = [];
     // TODO: Optimize this
     while (!(tempTerm.termType === 'NamedNode' && tempTerm.value === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#nil')) {
-      // eslint-disable-next-line no-await-in-loop
-      result.push(await this.getSingle(`SELECT DISTINCT ?r WHERE { <${tempTerm.value}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> ?r }`));
+      result.push(this.getSingle(`SELECT DISTINCT ?r WHERE { <${tempTerm.value}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> ?r }`));
       // eslint-disable-next-line no-await-in-loop
       tempTerm = await this.getSingle(`SELECT DISTINCT ?r WHERE { <${tempTerm.value}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> ?r }`);
     }
-    return result;
+    return Promise.all(result);
   }
 }

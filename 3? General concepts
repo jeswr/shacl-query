@@ -1,0 +1,8 @@
+3? General concepts
+1 - Ontology
+2 - Suppliments (Shacl, Shex, Ontology extensions etc.)
+3 - Modifiers, loaders, validators, inferencers. Can either apply globally (e.g. inference) or locally (e.g. validators)
+[or are ^^ just handlers]
+
+To consider - do we need to *force* users to load all supplimentary ontologies
+To think about - getting all proxies to reference the same ontology triples so we aren't creating a large number of dupllicate triples
