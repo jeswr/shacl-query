@@ -20,10 +20,10 @@ export function simplify(path: Path, inverse = false): Path {
           p.concat(pth.path);
           focus = focus || pth.focus;
         } else {
-          p.push(path);
+          p.push(pth);
         }
       }
-      return { type: 'alternate', path: p, focus: path.focus };
+      return p.length === 1 ? p[0] : { type: 'alternate', path: p, focus: path.focus };
     }
     case 'inverse':
       return simplify({ ...path, focus: path.path.focus || path.focus }, !inverse);
@@ -41,10 +41,10 @@ export function simplify(path: Path, inverse = false): Path {
           p.concat(pth.path);
           focus = focus || pth.focus;
         } else {
-          p.push(path);
+          p.push(pth);
         }
       }
-      return { type: 'alternate', path: p, focus: path.focus };
+      return p.length === 1 ? p[0] : { type: 'sequence', path: p, focus: path.focus };
     }
     case 'term':
       return inverse ? { type: 'inverse', path, focus: false } : path;
