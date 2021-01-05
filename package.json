@@ -58,6 +58,7 @@
     "arrayify-stream": "^1.0.0",
     "logic-statement-ts": "github:jeswr/logic-statement-ts",
     "md5": "^2.3.0",
+    "rdf-string": "^1.5.0",
     "sparqljs": "^3.2.0"
   }
 }

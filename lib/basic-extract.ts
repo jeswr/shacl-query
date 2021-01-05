@@ -18,6 +18,7 @@ import { Path } from './types';
 // OPTIONALLY ADD ABILITY TO COLLECT CLASS INFO ETC FOR EACH NODE AS WELL
 
 async function extractPath(path: Term, engine: ExtendedEngine, focus = false): Promise<Path> {
+  console.log('extracting path', path);
   if (path.termType === 'NamedNode') {
     return {
       type: 'term',
@@ -32,6 +33,7 @@ async function extractPath(path: Term, engine: ExtendedEngine, focus = false): P
       throw new Error('Bindings expected');
     }
     const bindings = await res.bindings();
+    console.log(path, bindings, bindings.length);
     if (bindings.length === 1) { // This is one of the sh:____path predicates
       const predicate = bindings[0].get('?r');
       if (predicate.termType !== 'NamedNode') {
@@ -78,7 +80,7 @@ async function extractPath(path: Term, engine: ExtendedEngine, focus = false): P
       // This is a list and hence a sequential path
       return {
         type: 'sequence',
-        path: await Promise.all((await engine.getList(bindings[0].get('?o'))).map((p) => extractPath(p, engine))),
+        path: await Promise.all((await engine.getList(path)).map((p) => extractPath(p, engine))),
         focus,
       };
     }

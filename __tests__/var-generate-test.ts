@@ -73,7 +73,7 @@ describe('Unit tests for the variable name generator', () => {
       i += 1;
       expect(hashes[i]).toEqual(undefined);
       hashes[i] = true;
-      if (i > 10000) {
+      if (i > 1000) {
         break;
       }
     }

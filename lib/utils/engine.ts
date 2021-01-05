@@ -62,7 +62,7 @@ export default class ExtendedEngine {
   // Used for queries where exactly one object is expected
   async getSingle(query: string): Promise<Term> {
     const res = await this.getBoundResults(query);
-    console.log('res', res)
+    console.log('res', res);
     if (res.length !== 1) {
       throw new Error(`Exactly one object expected for query: ${query}`);
     }
@@ -74,10 +74,10 @@ export default class ExtendedEngine {
   async getList(term: Term): Promise<Term[]> {
     let tempTerm = term;
     const result: (Promise<Term> | Term)[] = [];
-    console.log('start of get list')
+    console.log('start of get list');
     // TODO: Optimize this
     while (!(tempTerm.termType === 'NamedNode' && tempTerm.value === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#nil')) {
-    // TODO: REMOVE WHEN FINISHED DEBUGGING  
+    // TODO: REMOVE WHEN FINISHED DEBUGGING
     // eslint-disable-next-line no-await-in-loop
       result.push(await this.getSingle(`SELECT ?r WHERE { <${
         // @ts-ignore
@@ -87,7 +87,7 @@ export default class ExtendedEngine {
         // @ts-ignore
         tempTerm.skolemized?.value ?? tempTerm.value}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> ?r }`);
     }
-    console.log('end of get list')
+    console.log('end of get list');
     return Promise.all(result);
   }
 }
