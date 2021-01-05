@@ -5,6 +5,7 @@
 import { NamedNode } from 'rdf-js';
 import { Path } from './types';
 import { generateVar } from './utils/variable-generator';
+import * as R from 'ramda'
 
 /**
  * Trims off all parts of the query not relevant
@@ -100,6 +101,8 @@ function writeStaticComponent(query: Path, isNested = false): string {
       return `^${writeStaticComponent(query.path, true)}`;
     case 'zeroOrOne':
       return `${writeStaticComponent(query.path, true)}?`;
+    case 'zeroOrMore': // TODO: POSSIBLY REMOVE
+      return `${writeStaticComponent(query.path, true)}*`;
     case 'alternate': {
       if (query.path.length === 0) {
         throw new Error('Expected alternative path to have length >= 1');
@@ -125,9 +128,95 @@ function writeStaticComponent(query: Path, isNested = false): string {
   }
 }
 
-function writeCounterSelect(query: Path, subject: NamedNode): {
+function splitAlternative(query: Path): Path[] {
+  switch (query.type) {
+    case 'term': return [query];
+    case 'alternate': {
+      let r: Path[] = [];
+      for (const path of query.path) {
+        r = [...r, ...splitAlternative(path)]
+      }
+      return r;
+    }
+    // Applies cross prouc tot sequence
+    case 'sequence': {
+      const [first, ...applied] = query.path.map(path => splitAlternative(path));
+      let path = first.map(x => [x])
+      for (const app of applied) {
+        const prod = R.xprod(path, app);
+        path = prod.map(([x, y]) => [...x, y])
+      }
+      return path.map(p => ({
+        type: 'sequence',
+        path: p,
+        focus: query.focus
+      }))
+    }
+    case 'zeroOrMore':
+    case 'zeroOrOne':
+    case 'inverse': {
+      return splitAlternative(query.path).map(path => ({
+        type: query.type,
+        path,
+        focus: query.focus
+      }))
+    }
+    default: {
+      throw new Error(`Invalid query ${query}`)
+    }
+  }
+}
+
+function breakZeroOrMore(query: Path): { path: Path, zeroOrMore: Path }[] {
+  // Note splitAlternative should have already been applied so 'alternative' is not handled
+  switch (query.type) {
+    case 'term':
+    case 'zeroOrMore':
+    case 'inverse'
+  }
+}
+
+/**
+ * Returns a list of each path, each corresponds
+ * to a unique zero or more path that we need to
+ * test
+ */
+function getZeroOrMorePaths(query: Path): Path[] {
+  // APPROCH break into paths with the {Path} type and then run the static path constructor
+
+  // Step 1: Break down into alternatives
+
+
+  // Step 2: Break off at each zero or more path
+
+  if (query)
+
+    if (query.t)
+
+
+
+      for (const q of query.path) {
+
+      }
+
+
+
+  switch (query.type) {
+
+  }
+}
+
+function writeCounterSelect(query: Path, subject: NamedNode) {
   const generator = generateVar();
-  
+  // This implementation is *far from optimal*
+
+
+
+  query.
+    for(const q of query) {
+
+  }
+  return '';
 }
 
 /**
