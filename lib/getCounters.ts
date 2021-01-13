@@ -1,12 +1,8 @@
 // /* eslint-disable no-await-in-loop */
-// import { Term } from 'rdf-js';
-// import ExtendedEngine from './utils/engine';
-
 import { NamedNode } from 'rdf-js';
 import * as R from 'ramda';
 import md5 from 'md5';
 import { Path } from './types';
-import { generateVar } from './utils/variable-generator';
 
 /**
  * Trims off all parts of the query not relevant
@@ -170,7 +166,6 @@ function splitAlternative(query: Path): Path[] {
 
 function breakZeroOrMore(query: Path): { path?: Path, zeroOrMore: Path }[] {
   // Note splitAlternative should have already been applied so 'alternative' is not handled
-  console.log(query);
   switch (query.type) {
     case 'zeroOrMore': {
       if (!hasZeroOrMore(query.path)) {

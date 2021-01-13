@@ -10,15 +10,12 @@ import { Path } from './types';
 //   nested: ExtractedPath[];
 // }
 
-// TODO: (Unrelated) make drag-drop rdf package
-
 // CURRENT DESIGN DECISION - each sh:node call is a separate extraction procedure
 // OPTIONALLY add the collection of all objects related to a given subject so that we
 // can verify the sh:closed property
 // OPTIONALLY ADD ABILITY TO COLLECT CLASS INFO ETC FOR EACH NODE AS WELL
 
 async function extractPath(path: Term, engine: ExtendedEngine, focus = false): Promise<Path> {
-  console.log('extracting path', path);
   if (path.termType === 'NamedNode') {
     return {
       type: 'term',
@@ -33,7 +30,6 @@ async function extractPath(path: Term, engine: ExtendedEngine, focus = false): P
       throw new Error('Bindings expected');
     }
     const bindings = await res.bindings();
-    console.log(path, bindings, bindings.length);
     if (bindings.length === 1) { // This is one of the sh:____path predicates
       const predicate = bindings[0].get('?r');
       if (predicate.termType !== 'NamedNode') {
@@ -100,14 +96,11 @@ SELECT DISTINCT ?property ?path WHERE {
   ?property sh:path ?path .
 }`;
 
-  console.log(q);
-
   const res = await engine.query(q);
 
   if (res.type !== 'bindings') {
     throw new Error('Expected bindings of length 1');
   }
-  console.log('pre binding stream');
   const properties = res.bindingsStream.map(async (result): Promise<Path> => {
     // TODO: Remove this await once finished debugging
     const path = await extractPath(result.get('?path'), engine);
@@ -125,7 +118,6 @@ SELECT DISTINCT ?property ?path WHERE {
     }
     return path;
   });
-  console.log('post bining stream');
   return new Promise((resolve, reject) => {
     const array: Promise<Path>[] = [];
     properties.on('data', (d: Promise<Path>) => {
@@ -148,9 +140,7 @@ async function extractNodes(propertyNode: Term, engine: ExtendedEngine) {
   // TODO: Remove when finished debugging
   // @ts-ignore
   const q = `SELECT ?r WHERE { <${propertyNode.skolemized?.value ?? propertyNode.value}> <http://www.w3.org/ns/shacl#node> ?r }`;
-  console.log(q);
   const res = await engine.getBoundResults(q);
-  console.log(res);
   return Promise.all(res.map((node) => extractProperties(node, engine)));
 }
 

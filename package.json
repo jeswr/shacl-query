@@ -52,7 +52,8 @@
     "ts-jest": "^26.4.4"
   },
   "jest": {
-    "preset": "ts-jest"
+    "preset": "ts-jest",
+    "testRegex": "/__tests__/.*-test.ts"
   },
   "dependencies": {
     "@types/rdf-js": "^4.0.0",
