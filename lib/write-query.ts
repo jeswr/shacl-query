@@ -45,14 +45,18 @@ function createConstructPattern(path: Path, subject: Term, object: Term, nextVar
         throw new Error('Expected alternate path length to be >= 1')
       }
       const [p, ...rest] = path.path
-      let pattern = createConstructPattern(p, subject, object, nextVar);
+      let pattern = createConstructPattern(p, subject, object, nextVar, pathUpTo);
       for (const elem of rest) {
-        pattern = factory.createUnion(pattern, createConstructPattern(elem, subject, object, nextVar));
+        pattern = factory.createUnion(pattern, createConstructPattern(elem, subject, object, nextVar, pathUpTo));
       }
       return pattern;
     }
     case 'inverse': {
-      return createConstructPattern(path.path, object, subject, nextVar)
+      return createConstructPattern(path.path, object, subject, nextVar, {
+        type: 'inverse',
+        path: pathUpTo,
+        focus: path.focus
+      })
     }
     case 'sequence': {
       if (path.path.length < 1) {
@@ -83,7 +87,7 @@ function createConstructPattern(path: Path, subject: Term, object: Term, nextVar
     case 'zeroOrOne': {
       const variable = nextVar();
       return factory.createExtend(
-        createConstructPattern(path, subject, variable, nextVar),
+        createConstructPattern(path, subject, variable, nextVar, pathUpTo),
         variable,
         factory.createTermExpression(subject),
       )
