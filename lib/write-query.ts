@@ -8,6 +8,9 @@ import { BaseQuad, Variable } from 'n3';
 import { remove } from 'ramda';
 import { Term } from 'rdf-js';
 import { Path } from './types';
+import { pathHash } from './path-hash'
+import factory from 'sparqlalgebrajs/lib/factory';
+
 // import factory from 'sparqlalgebrajs/lib/factory';
 ?s ?p ?o .
   	VALUES (?p) { (rdfs:label) }
@@ -36,7 +39,7 @@ function createAlternative() {
 
 }
 
-function createConstructPattern(path: Path, subject: Term, object: Term, nextVar: () => Variable, pathUpTo: Path): Algebra.Pattern | Algebra.Union | Algebra.Extend | Algebra.Join {
+function createConstructPattern(path: Path, subject: Term, object: Term, nextVar: () => Variable, pathUpTo: Path, counterMap: Map): Algebra.Pattern | Algebra.Union | Algebra.Extend | Algebra.Join {
   const factory = new Factory();
   // IF FOCUS - ADD OPTIONAL { {subject} ?p ?o }
   switch (path.type) {
@@ -45,23 +48,27 @@ function createConstructPattern(path: Path, subject: Term, object: Term, nextVar
         throw new Error('Expected alternate path length to be >= 1')
       }
       const [p, ...rest] = path.path
-      let pattern = createConstructPattern(p, subject, object, nextVar);
+      let pattern = createConstructPattern(p, subject, object, nextVar, pathUpTo, counterMap);
       for (const elem of rest) {
-        pattern = factory.createUnion(pattern, createConstructPattern(elem, subject, object, nextVar));
+        pattern = factory.createUnion(pattern, createConstructPattern(elem, subject, object, nextVar, pathUpTo, counterMap));
       }
       return pattern;
     }
     case 'inverse': {
-      return createConstructPattern(path.path, object, subject, nextVar)
+      return createConstructPattern(path.path, object, subject, nextVar, {
+        type: 'inverse',
+        path: pathUpTo,
+        focus: path.focus
+      }, counterMap)
     }
     case 'sequence': {
       if (path.path.length < 1) {
         throw new Error('Expected sequence path length to be >= 1')
       }
       let tempSubject = subject;
-      let seq = createConstructPattern(path.path[0], tempSubject, tempSubject = nextVar(), nextVar);
+      let seq = createConstructPattern(path.path[0], tempSubject, tempSubject = nextVar(), nextVar, pathUpTo, counterMap);
       for (let i = 1; i < path.path.length - 1; i += 1) {
-        seq = factory.createJoin(seq, createConstructPattern(path.path[i], tempSubject, tempSubject = nextVar(), nextVar))
+        seq = factory.createJoin(seq, createConstructPattern(path.path[i], tempSubject, tempSubject = nextVar(), nextVar, pathUpTo, counterMap))
       }
       return seq;
     }
@@ -73,17 +80,33 @@ function createConstructPattern(path: Path, subject: Term, object: Term, nextVar
       );
     }
     case 'zeroOrMore': {
-      return factory.createPattern(
-        lastVariable,
-        path.path,
-        variable('?o'),
-        null,
-      );
+      const counter = counterMap.get(pathHash({ path: pathUpTo, zeroOrMore: path.path }));
+      const variable = nextVar();
+      let p = factory.createExtend(
+        createConstructPattern(path, subject, variable, nextVar, pathUpTo, counterMap),
+        variable,
+        factory.createTermExpression(subject),
+      )
+      for (let i = 0; i <= counter; i += 1) {
+        const variable2 = nextVar();
+        p = factory.createLeftJoin(p, factory.createExtend(
+          createConstructPattern(path, subject, variable2, nextVar, pathUpTo, counterMap),
+          variable2,
+          factory.createTermExpression(subject),
+        ))
+      }
+      return p;
+      // return factory.createPattern(
+      //   lastVariable,
+      //   path.path,
+      //   variable('?o'),
+      //   null,
+      // );
     }
     case 'zeroOrOne': {
       const variable = nextVar();
       return factory.createExtend(
-        createConstructPattern(path, subject, variable, nextVar),
+        createConstructPattern(path, subject, variable, nextVar, pathUpTo, counterMap),
         variable,
         factory.createTermExpression(subject),
       )
