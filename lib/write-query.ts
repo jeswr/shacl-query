@@ -1,74 +1,103 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import { Map } from 'immutable';
-import {
-  Factory, toSparql, translate, Util, Algebra, Algebra, Algebra,
-} from 'sparqlalgebrajs';
-import { namedNode, quad, variable } from '@rdfjs/data-model';
-import { BaseQuad, Variable } from 'n3';
-import { remove } from 'ramda';
-import { Term } from 'rdf-js';
+import { Term, Variable } from 'rdf-js';
+import { Algebra, Factory } from 'sparqlalgebrajs';
+import { varGenerator } from './utils';
+import { pathHash } from './path-hash';
 import { Path } from './types';
-import { pathHash } from './path-hash'
-import factory from 'sparqlalgebrajs/lib/factory';
 
-// import factory from 'sparqlalgebrajs/lib/factory';
-?s ?p ?o .
-  	VALUES (?p) { (rdfs:label) }
+type ConstructComponent =
+  | Algebra.LeftJoin
+  | Algebra.Bgp
+  | Algebra.Union
+  | Algebra.Extend
+  | Algebra.Pattern
+  | Algebra.Join;
 
-// ex:p1/ex:p2 -> SUBJECT ex:p1 ?v0 . ?v0 ex:p2 ?v1
-// ex:p1|ex:p2 -> 
-OPTIONAL
-BIND
-UNION
-
-
-function getPatterns(op: Algebra.LeftJoin | Algebra.Bgp | Algebra.Union | Algebra.Extend | Algebra.Join): Algebra.Pattern[] {
+function getPatterns(op: ConstructComponent):
+  Algebra.Pattern[] {
   if (op.type === 'bgp') {
     return op.patterns;
   } if (op.type === 'leftjoin' || op.type === 'union' || op.type === 'join') {
     return [...getPatterns(op.input.left), ...getPatterns(op.input.right)];
+  } if (op.type === 'pattern') {
+    return [op];
+  } if (op.type === 'extend') {
+    // TODO: Remove nasty type casting here
+    return getPatterns(op.input as ConstructComponent);
   }
+  const r: null = op;
   throw new Error('Expected pattern or left join');
 }
 
-function toConstructAlgebra(op: Algebra.LeftJoin | Algebra.Bgp, factory = new Factory()) {
+function toConstructAlgebra(op: ConstructComponent, factory = new Factory()) {
   return factory.createConstruct(op, getPatterns(op));
 }
 
-function createAlternative() {
-
-}
-
-function createConstructPattern(path: Path, subject: Term, object: Term, nextVar: () => Variable, pathUpTo: Path, counterMap: Map): Algebra.Pattern | Algebra.Union | Algebra.Extend | Algebra.Join {
+function createConstructPattern(
+  path: Path,
+  subject: Term,
+  object: Term,
+  pathUpTo: Path | undefined,
+  counterMap: Map<string, number> = Map(),
+  collectFocusDetail = true,
+  fallbackCount?: number,
+  nextVar: (() => Variable) = varGenerator(),
+):
+  ConstructComponent {
   const factory = new Factory();
+  if (path.focus && collectFocusDetail) {
+    // TODO
+  }
   // IF FOCUS - ADD OPTIONAL { {subject} ?p ?o }
   switch (path.type) {
     case 'alternate': {
       if (path.path.length < 1) {
-        throw new Error('Expected alternate path length to be >= 1')
+        throw new Error('Expected alternate path length to be >= 1');
       }
-      const [p, ...rest] = path.path
-      let pattern = createConstructPattern(p, subject, object, nextVar, pathUpTo, counterMap);
+      const [p, ...rest] = path.path;
+      let pattern = createConstructPattern(
+        p, subject, object, pathUpTo, counterMap, collectFocusDetail, fallbackCount, nextVar,
+      );
       for (const elem of rest) {
-        pattern = factory.createUnion(pattern, createConstructPattern(elem, subject, object, nextVar, pathUpTo, counterMap));
+        pattern = factory.createUnion(pattern,
+          createConstructPattern(
+            elem, subject, object, pathUpTo, counterMap, collectFocusDetail, fallbackCount, nextVar,
+          ));
       }
       return pattern;
     }
     case 'inverse': {
-      return createConstructPattern(path.path, object, subject, nextVar, {
-        type: 'inverse',
-        path: pathUpTo,
-        focus: path.focus
-      }, counterMap)
+      return createConstructPattern(path.path, object, subject,
+        // TODO: Fix his case - probably need reverse flag
+        pathUpTo,
+        counterMap, collectFocusDetail, fallbackCount, nextVar);
     }
     case 'sequence': {
       if (path.path.length < 1) {
-        throw new Error('Expected sequence path length to be >= 1')
+        throw new Error('Expected sequence path length to be >= 1');
       }
       let tempSubject = subject;
-      let seq = createConstructPattern(path.path[0], tempSubject, tempSubject = nextVar(), nextVar, pathUpTo, counterMap);
+      let seq = createConstructPattern(
+        path.path[0],
+        tempSubject,
+        tempSubject = nextVar(),
+        pathUpTo,
+        counterMap,
+        collectFocusDetail,
+        fallbackCount,
+        nextVar,
+      );
       for (let i = 1; i < path.path.length - 1; i += 1) {
-        seq = factory.createJoin(seq, createConstructPattern(path.path[i], tempSubject, tempSubject = nextVar(), nextVar, pathUpTo, counterMap))
+        seq = factory.createJoin(seq, createConstructPattern(
+          path.path[i],
+          tempSubject,
+          tempSubject = nextVar(),
+          pathUpTo,
+          counterMap,
+          collectFocusDetail,
+          fallbackCount,
+          nextVar,
+        ));
       }
       return seq;
     }
@@ -80,103 +109,63 @@ function createConstructPattern(path: Path, subject: Term, object: Term, nextVar
       );
     }
     case 'zeroOrMore': {
-      const counter = counterMap.get(pathHash({ path: pathUpTo, zeroOrMore: path.path }));
-      const variable = nextVar();
-      let p = factory.createExtend(
-        createConstructPattern(path, subject, variable, nextVar, pathUpTo, counterMap),
+      const counter = counterMap.get(pathHash({ path: pathUpTo, zeroOrMore: path.path }))
+      ?? fallbackCount;
+      if (counter === undefined) {
+        throw new Error('Counter is undefined and no fallback is provided');
+      }
+      let variable = nextVar();
+      let p: Algebra.Extend | Algebra.LeftJoin = factory.createExtend(
+        createConstructPattern(
+          path, subject, variable, pathUpTo, counterMap, collectFocusDetail, fallbackCount, nextVar,
+        ),
         variable,
         factory.createTermExpression(subject),
-      )
+      );
       for (let i = 0; i <= counter; i += 1) {
-        const variable2 = nextVar();
+        variable = nextVar();
         p = factory.createLeftJoin(p, factory.createExtend(
-          createConstructPattern(path, subject, variable2, nextVar, pathUpTo, counterMap),
-          variable2,
+          createConstructPattern(
+            path,
+            subject,
+            variable,
+            pathUpTo,
+            counterMap,
+            collectFocusDetail,
+            fallbackCount,
+            nextVar,
+          ),
+          variable,
           factory.createTermExpression(subject),
-        ))
+        ));
       }
       return p;
-      // return factory.createPattern(
-      //   lastVariable,
-      //   path.path,
-      //   variable('?o'),
-      //   null,
-      // );
     }
     case 'zeroOrOne': {
       const variable = nextVar();
       return factory.createExtend(
-        createConstructPattern(path, subject, variable, nextVar, pathUpTo, counterMap),
+        createConstructPattern(
+          path, subject, variable, pathUpTo, counterMap, collectFocusDetail, fallbackCount, nextVar,
+        ),
         variable,
         factory.createTermExpression(subject),
-      )
+      );
     }
     default:
       throw new Error(`Invalid path type ${path}`);
   }
 }
 
-export default function writeQuery(path: Path, counters: Map<string, number>): string {
-  const factory = new Factory();
-  // factory.createLeftJoin(
-  //   factory.createOpera
-  // )
-
-  const pattern1 = factory.createPattern(
-    namedNode('http://a1'),
-    namedNode('http://a2'),
-    namedNode('http://a3'),
+export default function pathToConstructQuery(
+  path: Path,
+  subject: Term,
+  counterMap: Map<string, number>,
+  collectFocusDetail?: boolean,
+  fallbackCount?: number,
+) {
+  const generator = varGenerator();
+  const pattern = createConstructPattern(
+    path, subject, generator(), undefined, counterMap, collectFocusDetail, fallbackCount, generator,
   );
-
-  const pattern = factory.createPattern(
-    namedNode('http://1'),
-    namedNode('http://2'),
-    namedNode('http://3'),
-  );
-
-  // console.log(JSON.stringify(translate('CONSTRUCT { ?s ?p ?o } WHERE { ?a ?b ?c . OPTIONAL { ?s ?p ?o } }'), null, 2))
-  // factory.createAdd
-
-  const optional = factory.createLeftJoin(
-    factory.createBgp([pattern1]),
-    factory.createBgp([pattern]),
-  );
-
-  const operation = factory.createConstruct(
-    optional,
-    // factory.createBgp([
-    //   pattern,
-    //   pattern,
-    // ]),
-    [pattern, pattern],
-  );
-
-  // const operator = factory.createLeftJoin(pattern, pattern);
-  // const optional = {
-  //   type: 'optional',
-  //   patterns: [
-  //     pattern,
-  //   ],
-  // };
-
-  // const operator = factory.createProject(
-  //   factory.createOperatorExpression('SELECT', [
-  //     factory.createTermExpression(
-  //       quad(
-  //         namedNode('http://example.org/myShape'), namedNode('http://'), variable('?o'),
-  //       ),
-  //     ),
-  //   ]),
-  //   [],
-  // );
-  // const operator = factory.createOperatorExpression('optional', [
-  //   pattern
-  // ]);
-  return toSparql(operation);
+  return toConstructAlgebra(pattern);
 }
-
-console.log(writeQuery({
-  type: 'term',
-  path: namedNode('http://example.org/myPath'),
-  focus: true,
-}, Map()));

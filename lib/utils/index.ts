@@ -1,4 +1,2 @@
-import ExtendedEngine from './engine';
-
-// eslint-disable-next-line import/prefer-default-export
-export { ExtendedEngine };
+export { default as ExtendedEngine } from './engine';
+export { default as varGenerator } from './basic-variable-generator';
