@@ -1,11 +1,12 @@
 import { Map } from 'immutable';
+import { namedNode } from '@rdfjs/data-model';
 import { Term, Variable } from 'rdf-js';
-import { Algebra, Factory } from 'sparqlalgebrajs';
+import { Algebra, Factory, toSparql } from 'sparqlalgebrajs';
 import { varGenerator } from './utils';
 import { pathHash } from './path-hash';
 import { Path } from './types';
 
-type ConstructComponent =
+export type ConstructComponent =
   | Algebra.LeftJoin
   | Algebra.Bgp
   | Algebra.Union
@@ -13,12 +14,24 @@ type ConstructComponent =
   | Algebra.Pattern
   | Algebra.Join;
 
+export function mapAndApplyPairwise<T, K>(f: (i: T) => K, g: (l: K, r: K) => K, input: T[]) {
+  if (input.length < 1) {
+    throw new Error('Expected length to be >= 1');
+  }
+  let value = f(input[0]);
+  for (let i = 1; i < input.length; i += 1) {
+    value = g(value, f(input[i]));
+  }
+  return value;
+}
+
 function getPatterns(op: ConstructComponent):
   Algebra.Pattern[] {
   if (op.type === 'bgp') {
     return op.patterns;
   } if (op.type === 'leftjoin' || op.type === 'union' || op.type === 'join') {
-    return [...getPatterns(op.input.left), ...getPatterns(op.input.right)];
+    return [...getPatterns(op.left as ConstructComponent),
+      ...getPatterns(op.right as ConstructComponent)];
   } if (op.type === 'pattern') {
     return [op];
   } if (op.type === 'extend') {
@@ -55,13 +68,25 @@ function createConstructPattern(
         throw new Error('Expected alternate path length to be >= 1');
       }
       const [p, ...rest] = path.path;
-      let pattern = createConstructPattern(
-        p, subject, object, pathUpTo, counterMap, collectFocusDetail, fallbackCount, nextVar,
+      let variable = nextVar();
+      let pattern: Algebra.Extend | Algebra.Join = factory.createExtend(
+        createConstructPattern(
+          p, subject, variable, pathUpTo, counterMap, collectFocusDetail, fallbackCount, nextVar,
+        ),
+        variable,
+        factory.createTermExpression(object),
       );
+
       for (const elem of rest) {
-        pattern = factory.createUnion(pattern,
-          createConstructPattern(
-            elem, subject, object, pathUpTo, counterMap, collectFocusDetail, fallbackCount, nextVar,
+        variable = nextVar();
+        pattern = factory.createJoin(pattern,
+          factory.createExtend(
+            createConstructPattern(
+              elem,
+              subject, variable, pathUpTo, counterMap, collectFocusDetail, fallbackCount, nextVar,
+            ),
+            variable,
+            factory.createTermExpression(object),
           ));
       }
       return pattern;
@@ -87,7 +112,7 @@ function createConstructPattern(
         fallbackCount,
         nextVar,
       );
-      for (let i = 1; i < path.path.length - 1; i += 1) {
+      for (let i = 1; i < path.path.length; i += 1) {
         seq = factory.createJoin(seq, createConstructPattern(
           path.path[i],
           tempSubject,
@@ -159,7 +184,7 @@ function createConstructPattern(
 export default function pathToConstructQuery(
   path: Path,
   subject: Term,
-  counterMap: Map<string, number>,
+  counterMap?: Map<string, number>,
   collectFocusDetail?: boolean,
   fallbackCount?: number,
 ) {
@@ -169,3 +194,44 @@ export default function pathToConstructQuery(
   );
   return toConstructAlgebra(pattern);
 }
+
+const thePath: Path = {
+  focus: true,
+  path: [{
+    type: 'term',
+    path: namedNode('http://example.org/myPath/1'),
+    focus: true,
+  }, {
+    type: 'term',
+    path: namedNode('http://example.org/myPath/2'),
+    focus: true,
+  }],
+  type: 'alternate',
+};
+
+console.log(
+  JSON.stringify(
+    pathToConstructQuery({
+      focus: true,
+      path: [{
+        type: 'term',
+        path: namedNode('http://example.org/myPath/1'),
+        focus: true,
+      }, {
+        type: 'term',
+        path: namedNode('http://example.org/myPath/2'),
+        focus: true,
+      }],
+      type: 'alternate',
+    },
+    namedNode('http://Jesse')),
+    null,
+    2,
+  ),
+);
+
+console.log(toSparql(pathToConstructQuery({
+  type: 'sequence',
+  path: [thePath, thePath, thePath],
+  focus: false,
+}, namedNode('http://Jesse'))));
