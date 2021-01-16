@@ -4,7 +4,7 @@ import { Algebra, Factory, toSparql } from 'sparqlalgebrajs';
 import { namedNode } from '@rdfjs/data-model';
 import { varGenerator } from './utils';
 import { pathHash } from './path-hash';
-import { Path } from './types';
+import { AtomPath, Path } from './types';
 
 export type ConstructComponent =
   | Algebra.LeftJoin
@@ -123,40 +123,57 @@ export default class ConstructPatternFactory {
           inverse ? subject : object,
         );
       }
-      case 'zeroOrMore': {
-        const vars: Variable[] = [];
-        const count = this.getCounter({ path: pathHistory, zeroOrMore: path.path });
-        for (let i = 0; i <= count; i += 1) {
-          vars.push(this.nextVar());
-        }
-        let tempSub = subject;
-        let variable = this.nextVar();
-        let seq: ConstructComponent = this.createConstructPattern(
-          path.path, vars[count], vars[count + 1], pathHistory, inverse,
-        );
-
-        for (let i = 1; i < count; i += 1) {
-          tempSub = variable;
-          variable = (i === count - 1) ? object : this.nextVar();
-          seq = this.factory.createLeftJoin(
-            this.createConstructPattern(
-              path.path, vars[count - i], vars[count - i + 1], pathHistory, inverse
-            ), seq,
-          );
-        }
-        return seq;
-      }
-      case 'zeroOrOne': {
-        const variable = this.nextVar();
-        return this.factory.createExtend(
-          this.createConstructPattern(path.path, subject, variable, pathHistory, inverse),
-          variable,
-          this.factory.createTermExpression(subject),
-        );
-      }
+      case 'zeroOrMore':
+        return this.writeByCount(path, subject, object, pathHistory, inverse, this.getCounter({
+          zeroOrMore: path.path,
+        }));
+      case 'zeroOrOne':
+        return this.writeByCount(path, subject, object, pathHistory, inverse);
       default:
         throw new Error('Invalid');
     }
+  }
+
+  public writeByCount(
+    path: AtomPath,
+    subject: Term,
+    object: Variable = this.nextVar(),
+    pathHistory: Path | undefined = undefined,
+    inverse: boolean = false,
+    count = 1,
+  ) {
+    const vars: Variable[] = [object];
+    for (let i = 0; i < count + 1; i += 1) {
+      vars.push(this.nextVar());
+    }
+    let seq: ConstructComponent = this.createConstructPattern(
+      path.path, vars[count], vars[count + 1], pathHistory, inverse,
+    );
+
+    for (let i = 0; i < count - 1; i += 1) {
+      seq = this.factory.createLeftJoin(
+        this.createConstructPattern(
+          path.path,
+          (i === count - 2) ? subject : vars[count - i - 1],
+          vars[count - i],
+          pathHistory, inverse,
+        ), seq,
+      );
+    }
+
+    let union: Algebra.Extend | Algebra.Union = this.factory.createExtend(
+      this.factory.createBgp([]), object, this.factory.createTermExpression(vars[2]),
+    );
+
+    for (let i = 3; i < vars.length; i += 1) {
+      union = this.factory.createUnion(union,
+        this.factory.createExtend(
+          this.factory.createBgp([]), object, this.factory.createTermExpression(vars[i]),
+        ));
+    }
+    const full = this.factory.createLeftJoin(this.factory.createBgp([]), seq);
+    const segment = this.factory.createJoin(full, union);
+    return segment;
   }
 
   public toConstructAlgebra(op: ConstructComponent) {
@@ -174,7 +191,7 @@ export default class ConstructPatternFactory {
   }
 }
 
-const myFactory = new ConstructPatternFactory(Map(), false, 4);
+const myFactory = new ConstructPatternFactory(Map(), false, 2);
 
 const toTerm = (t: string): Path => ({
   type: 'term',
@@ -199,7 +216,7 @@ const mySequence: Path = {
 
 const myZeroOrOne: Path = {
   type: 'zeroOrMore',
-  path: toTerm('http://www.w3.org/1999/02/22-rdf-syntax-ns#rest'),
+  path: mySequence,
   focus: false,
 };
 
@@ -209,6 +226,11 @@ console.log(toSparql(myFactory.pathToConstructQuery({
     toTerm('http://list'),
     myZeroOrOne,
     toTerm('http://www.w3.org/1999/02/22-rdf-syntax-ns#first'),
+    {
+      type: 'inverse',
+      path: thePath,
+      focus: false,
+    },
   ],
   type: 'sequence',
 }, namedNode('http://Jesse'))));
