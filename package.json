@@ -57,7 +57,9 @@
     "testRegex": "/__tests__/.*-test.ts"
   },
   "dependencies": {
+    "@rdfjs/data-model": "^1.2.0",
     "arrayify-stream": "^1.0.0",
+    "immutable": "^3.8.2",
     "logic-statement-ts": "github:jeswr/logic-statement-ts",
     "md5": "^2.3.0",
     "rambda": "^6.4.0",
