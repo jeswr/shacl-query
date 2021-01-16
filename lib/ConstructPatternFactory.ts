@@ -78,9 +78,26 @@ export default class ConstructPatternFactory {
     pathHistory: Path | undefined = undefined,
     inverse: boolean = false,
   ): ConstructComponent {
+    const algebra = this.createConstructPatternInternal(
+      path, subject, object, pathHistory, inverse,
+    );
+    console.log(path.focus, this.focusDetail)
     if (path.focus && this.focusDetail) {
-      // TODO
+      console.log('adding')
+      return this.factory.createLeftJoin(algebra, this.factory.createBgp([
+        this.factory.createPattern(subject, this.nextVar(), this.nextVar())
+      ]));
     }
+    return algebra;
+  }
+
+  private createConstructPatternInternal(
+    path: Path,
+    subject: Term,
+    object: Variable = this.nextVar(),
+    pathHistory: Path | undefined = undefined,
+    inverse: boolean = false,
+  ): ConstructComponent {
     const createExtend = (p: Path): Algebra.Extend | Algebra.Join | Algebra.LeftJoin => {
       const variable = this.nextVar();
       return this.factory.createExtend(
@@ -191,7 +208,7 @@ export default class ConstructPatternFactory {
   }
 }
 
-const myFactory = new ConstructPatternFactory(Map(), false, 2);
+const myFactory = new ConstructPatternFactory(Map(), true, 2);
 
 const toTerm = (t: string): Path => ({
   type: 'term',
@@ -200,7 +217,7 @@ const toTerm = (t: string): Path => ({
 });
 
 const thePath: Path = {
-  focus: true,
+  focus: false,
   path: [
     toTerm('http://example.org/myPath/1'),
     toTerm('http://example.org/myPath/2'),
