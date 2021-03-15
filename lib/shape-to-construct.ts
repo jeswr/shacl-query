@@ -22,7 +22,7 @@ export default async function run(
   // const processedCounters = processCount(counterBindings);
   // return processedCounters;
   const factory = new ConstructPatternFactory(Map(), false, 6);
-  const query = factory.createConstructPattern(properties, node);
+  const query = factory.createConstructPattern(simplifiedProperties, node);
   const data = await dataEngine.query(toSparql(query));
   if (data.type !== 'quads') {
     throw new Error('Quads expected from construct query');

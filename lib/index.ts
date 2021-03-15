@@ -109,7 +109,8 @@ export async function ShapeToSPARQL(shapeEngine: queryEngine, nodeShape: NamedNo
 /**
  * Internal select count
  */
-export function parseCollectLengthBindings(res: IQueryResult): Record<string, number> {
+export async function parseCollectLengthBindings(res: IQueryResult):
+  Promise<Record<string, number>> {
   if (res.type !== 'bindings') {
     throw new Error('Bindings expected');
   }
@@ -148,12 +149,13 @@ export function parseCollectLengthBindings(res: IQueryResult): Record<string, nu
  * we should mainitain order. Without recursion - or knowing the length of the path beforehand
  * to hardcode the path length into the SPARQL query - this *cannot* be done.
  */
-function collectLengths(shapeEngine: queryEngine, nodeShape: NamedNode, focusNode: NamedNode): Record<string, number> {
-  async function getBoundResults(query: string) {
-    const res = await shapeEngine.query(query);
-    if (res.type !== 'bindings') {
-      throw new Error('Bindings expected');
-    }
-    return res;
-  }
-}
+// async function collectLengths(shapeEngine: queryEngine, nodeShape: NamedNode, focusNode: NamedNode):
+//   Promise<Record<string, number>> {
+//   async function getBoundResults(query: string) {
+//     const res = await shapeEngine.query(query);
+//     if (res.type !== 'bindings') {
+//       throw new Error('Bindings expected');
+//     }
+//     return res;
+//   }
+// }

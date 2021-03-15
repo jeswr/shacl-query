@@ -6,15 +6,15 @@ import { namedNode } from '@rdfjs/data-model';
 import { quadsToEngine } from './utils';
 import extractor from '../lib/shape-to-construct';
 
-describe('', () => {
+describe('Testing the SHACL SHACL shape', () => {
   // Testing that the shacl-shacl constraint can extract the shacl-shacl
   // constraint (isn't that fun!)
   const parser = new Parser();
   const quads = parser.parse(fs.readFileSync(path.join(__dirname, 'files', 'shacl-shacl.ttl')).toString());
   const engine = quadsToEngine(quads);
-  const shapeShape = namedNode('http://www.w3.org/ns/shacl-shacl#');
-  it('', async () => {
-    const data = await extractor(engine, engine);
+  const shapeShape = namedNode('http://www.w3.org/ns/shacl-shacl#ShapeShape');
+  it('The SHACL SHACL shape should extract the SHACL SHACL shape', async () => {
+    const data = await extractor(engine, engine, shapeShape, shapeShape);
   });
 });
 
