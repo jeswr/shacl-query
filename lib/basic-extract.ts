@@ -4,6 +4,8 @@
 import { Term } from 'rdf-js';
 import ExtendedEngine from './utils/engine';
 import { Path } from './types';
+import { RdfObjectLoader } from 'rdf-object';
+import { RdfObjectProxy } from 'rdf-object-proxy';
 
 async function extractPath(path: Term, engine: ExtendedEngine, focus = false): Promise<Path> {
   if (path.termType === 'NamedNode') {
@@ -81,7 +83,8 @@ export async function extractProperties(node: Term, engine: ExtendedEngine): Pro
 PREFIX sh: <http://www.w3.org/ns/shacl#>
 SELECT DISTINCT ?property ?path WHERE { 
   <${
-  // @ts-ignore
+  // TODO: FIX - Need distinction between listed and nots
+    // @ts-ignore
   node.skolemized?.value ?? node.value}> (sh:not|sh:and|sh:or|sh:xone)*/sh:property ?property .
   ?property sh:path ?path .
 }`;

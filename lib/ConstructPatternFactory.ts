@@ -27,19 +27,23 @@ export function mapAndApplyPairwise<T, K>(f: (i: T) => K, g: (l: K, r: K) => K, 
 
 function getPatterns(op: ConstructComponent):
   Algebra.Pattern[] {
-  if (op.type === 'bgp') {
-    return op.patterns;
-  } if (op.type === 'leftjoin' || op.type === 'union' || op.type === 'join') {
-    return [...getPatterns(op.left as ConstructComponent),
-      ...getPatterns(op.right as ConstructComponent)];
-  } if (op.type === 'pattern') {
-    return [op];
-  } if (op.type === 'extend') {
-    // TODO: Remove nasty type casting here
-    return getPatterns(op.input as ConstructComponent);
+  switch (op.type) {
+    case 'bgp':
+      return op.patterns;
+    case 'leftjoin':
+    case 'union':
+    case 'join':
+      return [...getPatterns(op.left as ConstructComponent),
+        ...getPatterns(op.right as ConstructComponent)];
+    case 'pattern':
+      return [op];
+    case 'extend':
+      return getPatterns(op.input as ConstructComponent);
+    default: {
+      const r: null = op;
+      throw new Error('Expected pattern or left join');
+    }
   }
-  const r: null = op;
-  throw new Error('Expected pattern or left join');
 }
 
 export class ConstructPatternFactory {
@@ -81,9 +85,7 @@ export class ConstructPatternFactory {
     const algebra = this.createConstructPatternInternal(
       path, subject, object, pathHistory, inverse,
     );
-    console.log(path.focus, this.focusDetail);
     if (path.focus && this.focusDetail) {
-      console.log('adding');
       return this.factory.createLeftJoin(algebra, this.factory.createBgp([
         this.factory.createPattern(subject, this.nextVar(), this.nextVar()),
       ]));

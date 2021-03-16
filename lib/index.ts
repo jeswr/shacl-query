@@ -1,3 +1,5 @@
+/* eslint-disable no-await-in-loop */
+/* eslint-disable no-undef */
 import { Generator } from 'sparqljs';
 import { namedNode, quad, variable } from '@rdfjs/data-model';
 import { Term, NamedNode } from 'rdf-js';
@@ -68,10 +70,12 @@ export async function ShapeToSPARQL(shapeEngine: queryEngine, nodeShape: NamedNo
   const currentVar = `<${focusNode.value}>`;
   const node = nodeShape;
 
-  // The issue with rdf:list is more generally an issue with any path that is not restricted to finite length
+  // The issue with rdf:list is more generally an issue 
+  // with any path that is not restricted to finite length
   // ie sh:path ( sh:ignoredProperties [ sh:zeroOrMorePath rdf:rest ] rdf:first ) ;
   // This is another issue that we have (in addition to nested shapes)
-  // Thought -> send an *initial* query that collects the length of such path and then adds the OPTIONAL {}
+  // Thought -> send an *initial* query that collects 
+  // the length of such path and then adds the OPTIONAL {}
   // to the query - atm this may be a reasonable option
   // TODO: Handle logic extraction
   const triples: { triple: [string, string, string], optional: boolean }[] = [];

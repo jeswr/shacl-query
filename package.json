@@ -58,6 +58,8 @@
     "testRegex": "/__tests__/.*-test.ts"
   },
   "dependencies": {
+    "@ontologies/core": "^2.0.2",
+    "@ontologies/shacl": "^1.0.0",
     "@rdfjs/data-model": "^1.2.0",
     "arrayify-stream": "^1.0.0",
     "immutable": "^3.8.2",
@@ -65,6 +67,8 @@
     "md5": "^2.3.0",
     "rambda": "^6.4.0",
     "ramda": "^0.27.1",
+    "rdf-object": "^1.10.1",
+    "rdf-object-proxy": "^1.0.0",
     "rdf-string": "^1.5.0",
     "sparqlalgebrajs": "^2.4.0",
     "sparqljs": "^3.2.0"
